@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "source": "macOS NSUserDictionaryReplacementItems, normalized for portability",
+  "source_count": 14,
+  "replacements": [
+    {
+      "trigger": ";handoff",
+      "replacement": "Generate a concise handoff prompt that I can paste into a new context window to continue this work seamlessly.",
+      "command": "handoff"
+    },
+    {
+      "trigger": ";plan",
+      "replacement": "Create a specification and tracer-bullet plan for the current Jira issue. Include useful reference artifacts, acceptance criteria, verification commands, and a concrete next action. Follow repository commit policy.",
+      "command": "plan-work",
+      "migration_note": "Uses the selected Jira issue as the work identity."
+    },
+    {
+      "trigger": ";demo",
+      "replacement": "Create a reviewable HTML artifact that visually demonstrates the work: showcase the completed implementation when available; otherwise, prototype the proposed idea. Make it easy for me to review, comment, and sign off.",
+      "command": "demo"
+    },
+    {
+      "trigger": ";diff",
+      "replacement": "Create an html artifact where I can see a diff of, like, what the changes are gonna be that you're proposing, and I could check off or leave a comment. And then once we're on the same page from there, we go ahead and execute on this.",
+      "command": "review-diff"
+    },
+    {
+      "trigger": ";land",
+      "replacement": "Safely land the current branch. Inspect status and history, identify the intended commits, verify required checks, preserve unrelated work, integrate the changes into main using non-destructive Git operations, verify the final state, and leave the checkout on main.",
+      "command": "land"
+    },
+    {
+      "trigger": ";build",
+      "replacement": "Use a worktree. Make the smallest coherent change that fully satisfies this request. Spawn multiple agents in parallel -- as many as you need to accomplish this task better and faster. break the work into independent pieces, dispatch them concurrently, and synthesize the results when they return. Own this task end-to-end. Continue autonomously while safe in-scope work remains.",
+      "command": "build"
+    },
+    {
+      "trigger": ";own",
+      "replacement": "Own this task end-to-end. Continue autonomously while safe in-scope work remains.",
+      "command": "own"
+    },
+    {
+      "trigger": ";min",
+      "replacement": "Make the smallest coherent change that fully satisfies this request.",
+      "command": "minimum-change"
+    },
+    {
+      "trigger": ";mi",
+      "replacement": "Propose the smallest coherent change that fully satisfies this request.",
+      "command": "minimum-proposal"
+    },
+    {
+      "trigger": ";study",
+      "replacement": "Onboard yourself to the current repository and study any attached or linked references. Read the applicable repository instructions and the relevant code, tests, plans, and documentation until you can explain the current design. Then open a grounded conversation: summarize your mental model, connect the references to the implementation, identify alignments, tensions, gaps, and limitations, and surface the highest-value questions or observations. Stay read-only; do not plan or change files unless I ask.",
+      "command": "study",
+      "migration_note": "The repository target is generalized for portability."
+    },
+    {
+      "trigger": ";debug",
+      "replacement": "Diagnose this causally before changing production behavior. Reproduce the failure, reconstruct the timeline and state transitions, identify the violated invariant and exact causal code path, explain why existing tests missed it, then implement the smallest durable correction and prove it with regression coverage.",
+      "command": "debug"
+    },
+    {
+      "trigger": ";comp",
+      "replacement": "Study the supplied idea or reference, then compare it with the current code and plans. Separate what already exists, partial coverage, genuine gaps, and current limitations. Recommend the highest-impact, lowest-complexity improvements and explain them in plain language.",
+      "command": "compare"
+    },
+    {
+      "trigger": ";explain",
+      "replacement": "Explain this as you would to a junior engineer. Start with the mental model, walk through the data flow and important components, use a concrete example, distinguish current behavior from limitations, and finish with the highest-impact next step.",
+      "command": "explain"
+    },
+    {
+      "trigger": ";spawn",
+      "replacement": "Spawn multiple agents in parallel -- as many as you need to accomplish this task better and faster. break the work into independent pieces, dispatch them concurrently, and synthesize the results when they return.",
+      "command": "spawn"
+    }
+  ]
+}

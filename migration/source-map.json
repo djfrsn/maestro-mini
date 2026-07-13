@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "source_agent_count": 5,
+  "source_skill_count": 11,
+  "agents": {
+    "checker": "checker",
+    "dialogue": "dialogue",
+    "director": "director",
+    "explorer": "explorer",
+    "maker": "maker"
+  },
+  "skills": {
+    "checking": "checking",
+    "chief-of-staff": "chief-of-staff",
+    "comms": "comms",
+    "grading": "grading",
+    "maestro": "maestro",
+    "planning": "planning",
+    "simplify-skill": "simplify-skill",
+    "swe-acceptance-testing": "acceptance-testing",
+    "swe-checking": "checking",
+    "swe-engineering": "engineering",
+    "triage": "triage"
+  }
+}
