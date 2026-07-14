@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "source_agent_count": 5,
-  "source_skill_count": 11,
+  "source_skill_count": 13,
   "agents": {
     "checker": "checker",
     "dialogue": "dialogue",
@@ -13,7 +13,9 @@
     "checking": "checking",
     "chief-of-staff": "chief-of-staff",
     "comms": "comms",
+    "doc-budget": "doc-budget",
     "grading": "grading",
+    "instruction-budget": "instruction-budget",
     "maestro": "maestro",
     "planning": "planning",
     "simplify-skill": "simplify-skill",

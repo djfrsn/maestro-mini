@@ -1,0 +1,196 @@
+<!doctype html>
+<!--
+  Instruction-budget report template.
+  Copy to docs/metrics/instruction-budget/<date>.html, then:
+    1. Run references/measure.py --json out.json and paste its object as DATA.
+    2. Fill DATA.meta (date, commit) and DATA.suggestions (ranked).
+  Everything renders from DATA; the markup below needs no edits.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instruction Budget</title>
+<style>
+  :root {
+    --surface-1: #fcfcfb; --plane: #f9f9f7;
+    --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
+    --grid: #e1e0d9; --baseline: #c3c2b7;
+    --bar: #2a78d6;
+    --good: #0ca30c; --warn: #fab219; --crit: #d03b3b;
+    --ring: rgba(11,11,11,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #1a1a19; --plane: #0d0d0d;
+      --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+      --grid: #2c2c2a; --baseline: #383835;
+      --bar: #3987e5;
+      --ring: rgba(255,255,255,0.10);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--plane); color: var(--ink-1);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 2rem 1rem;
+  }
+  main { max-width: 60rem; margin: 0 auto; display: grid; gap: 1.25rem; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.05rem; margin-bottom: .75rem; }
+  .sub { color: var(--ink-2); font-size: .9rem; }
+  section.card {
+    background: var(--surface-1); border: 1px solid var(--ring);
+    border-radius: .75rem; padding: 1.25rem;
+  }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; }
+  .tile { background: var(--surface-1); border: 1px solid var(--ring); border-radius: .75rem; padding: 1rem; }
+  .tile .value { font-size: 1.9rem; font-weight: 650; }
+  .tile .label { color: var(--ink-2); font-size: .85rem; }
+  .tile .note { color: var(--ink-muted); font-size: .8rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th { text-align: left; color: var(--ink-muted); font-weight: 500; padding: .3rem .5rem; border-bottom: 1px solid var(--grid); }
+  td { padding: .3rem .5rem; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .barwrap { position: relative; height: 14px; background: transparent; min-width: 10rem; }
+  .bar { position: absolute; inset: 3px auto 3px 0; background: var(--bar); border-radius: 0 4px 4px 0; }
+  .tick { position: absolute; top: -2px; bottom: -2px; width: 2px; }
+  .tick.target { background: var(--warn); }
+  .tick.max { background: var(--crit); }
+  .chip { display: inline-block; font-size: .75rem; padding: 0 .5rem; border-radius: .6rem; border: 1px solid; white-space: nowrap; }
+  .chip.ok { color: var(--good); border-color: var(--good); }
+  .chip.near { color: var(--warn); border-color: var(--warn); }
+  .chip.over { color: var(--crit); border-color: var(--crit); }
+  .legend { display: flex; gap: 1.25rem; color: var(--ink-2); font-size: .8rem; margin-top: .6rem; flex-wrap: wrap; }
+  .legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: .35rem; }
+  ol.suggestions { padding-left: 1.25rem; display: grid; gap: .6rem; }
+  ol.suggestions b { display: block; }
+  ol.suggestions .impact { color: var(--ink-muted); font-size: .82rem; }
+  footer { color: var(--ink-muted); font-size: .8rem; }
+  .scroll { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <hgroup>
+    <h1>Instruction Budget</h1>
+    <p class="sub" id="meta"></p>
+  </hgroup>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section class="card">
+    <h2>Budget model</h2>
+    <p class="sub" id="model"></p>
+  </section>
+
+  <section class="card">
+    <h2>Skills — instructions per SKILL.md</h2>
+    <div class="scroll"><table id="skills"></table></div>
+    <div class="legend" id="skills-legend"></div>
+  </section>
+
+  <section class="card">
+    <h2>Doctrine loads — instructions per session before the contract</h2>
+    <p class="sub">Project instructions + agent instructions + named skill. Ratio is
+      doctrine : slice budget for sessions that execute or check a slice.</p>
+    <div class="scroll"><table id="loads"></table></div>
+    <div class="legend" id="loads-legend"></div>
+  </section>
+
+  <section class="card">
+    <h2>Chains — cross-context gauge</h2>
+    <p class="sub">Summed doctrine across every hop. Context-window boundaries
+      isolate each hop at runtime; bucket for trend, not for alarm.</p>
+    <div class="scroll"><table id="chains"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Suggestions</h2>
+    <ol class="suggestions" id="suggestions"></ol>
+  </section>
+
+  <footer>
+    Method: an instruction is a sentence outside code blocks and frontmatter;
+    tokens are chars / 4. Dynamic content — briefs, contracts, review ledgers,
+    tool feedback, self-instruction — is unmeasured and spends the remaining
+    headroom. Produced by $instruction-budget.
+  </footer>
+</main>
+
+<script>
+const DATA = /* paste measure.py JSON here, then add meta + suggestions */ {
+  meta: { date: "YYYY-MM-DD", commit: "<short-sha>" },
+  budgets: {}, files: {}, loads: {}, chains: {},
+  suggestions: [
+    { title: "Example", detail: "What to change and where.", impact: "instructions saved / risk reduced" }
+  ]
+};
+
+const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const chip = s => s ? `<span class="chip ${s}">${{ ok: "✓ ok", near: "⚠ near", over: "✕ over" }[s]}</span>` : "";
+const bar = (v, scale, target, max) => `
+  <div class="barwrap">
+    <div class="bar" style="width:${(v / scale * 100).toFixed(1)}%"></div>
+    <div class="tick target" style="left:${(target / scale * 100).toFixed(1)}%"></div>
+    <div class="tick max" style="left:${(max / scale * 100).toFixed(1)}%"></div>
+  </div>`;
+const legend = (target, max) => `
+  <span><span class="swatch" style="background:var(--bar)"></span>instructions</span>
+  <span><span class="swatch" style="background:var(--warn)"></span>target ${target}</span>
+  <span><span class="swatch" style="background:var(--crit)"></span>max ${max}</span>`;
+
+function render() {
+  const b = DATA.budgets;
+  document.getElementById("meta").textContent =
+    `${DATA.meta.date} · ${DATA.meta.commit} · baseline of static doctrine only`;
+  document.getElementById("model").innerHTML =
+    `Full-run instruction-following budget: <b>${b.run.low}–${b.run.high}</b>; degradation begins in
+     that range and context rot compounds it. Fixed tracer-bullet slice budget: <b>${b.slice}</b>
+     available for execution work. Skill: target ≤${b.skill.target}, max ${b.skill.max}. Doctrine load:
+     target ≤${b.load.target}, max ${b.load.max}. Executing-session overhead ratio target:
+     ≤${b.ratio_target}:1, driving toward 1:1 and lower.`;
+
+  const skills = Object.entries(DATA.files).filter(([k]) => k.startsWith("skill/"));
+  const loads = Object.entries(DATA.loads);
+  const worst = loads.reduce((a, [k, v]) => v.instructions > a[1].instructions ? [k, v] : a, loads[0]);
+  const overTarget = skills.filter(([, v]) => v.status !== "ok").length;
+  const worstRatio = loads.filter(([, v]) => v.ratio).reduce((a, [k, v]) => v.ratio > a[1] ? [k, v.ratio] : a, ["", 0]);
+  const headroom = b.run.low - worst[1].instructions - b.slice;
+  document.getElementById("tiles").innerHTML = [
+    { v: worstRatio[1] + ":1", l: "worst overhead ratio", n: esc(worstRatio[0]) },
+    { v: worst[1].instructions, l: "heaviest doctrine load", n: esc(worst[0]) },
+    { v: headroom, l: "dynamic headroom (worst case)", n: `of ${b.run.low} before degradation` },
+    { v: `${overTarget}/${skills.length}`, l: "skills above target", n: `target ≤${b.skill.target}` },
+  ].map(t => `<div class="tile"><div class="value">${t.v}</div><div class="label">${t.l}</div><div class="note">${t.n}</div></div>`).join("");
+
+  const skillScale = Math.max(b.skill.max, ...skills.map(([, v]) => v.instructions)) * 1.1;
+  document.getElementById("skills").innerHTML =
+    `<tr><th>skill</th><th></th><th class="num">instr</th><th class="num">~tokens</th><th>status</th></tr>` +
+    skills.sort((x, y) => y[1].instructions - x[1].instructions).map(([k, v]) =>
+      `<tr><td>${esc(k.slice(6))}</td><td>${bar(v.instructions, skillScale, b.skill.target, b.skill.max)}</td>
+       <td class="num">${v.instructions}</td><td class="num">${v.tokens}</td><td>${chip(v.status)}</td></tr>`).join("");
+  document.getElementById("skills-legend").innerHTML = legend(b.skill.target, b.skill.max);
+
+  const loadScale = Math.max(b.load.max, ...loads.map(([, v]) => v.instructions)) * 1.1;
+  document.getElementById("loads").innerHTML =
+    `<tr><th>session</th><th></th><th class="num">instr</th><th class="num">~tokens</th><th class="num">ratio</th><th>status</th></tr>` +
+    loads.sort((x, y) => y[1].instructions - x[1].instructions).map(([k, v]) =>
+      `<tr><td>${esc(k)}</td><td>${bar(v.instructions, loadScale, b.load.target, b.load.max)}</td>
+       <td class="num">${v.instructions}</td><td class="num">${v.tokens}</td>
+       <td class="num">${v.ratio ? v.ratio + ":1" : "—"}</td><td>${chip(v.status)}</td></tr>`).join("");
+  document.getElementById("loads-legend").innerHTML = legend(b.load.target, b.load.max);
+
+  document.getElementById("chains").innerHTML =
+    `<tr><th>chain</th><th>hops</th><th class="num">instr</th><th class="num">~tokens</th></tr>` +
+    Object.entries(DATA.chains).map(([k, v]) =>
+      `<tr><td>${esc(k)}</td><td class="sub">${v.hops.map(esc).join(" → ")}</td>
+       <td class="num">${v.instructions}</td><td class="num">${v.tokens}</td></tr>`).join("");
+
+  document.getElementById("suggestions").innerHTML = DATA.suggestions.map(s =>
+    `<li><b>${esc(s.title)}</b>${esc(s.detail)} <span class="impact">${esc(s.impact)}</span></li>`).join("");
+}
+render();
+</script>
+</body>
+</html>

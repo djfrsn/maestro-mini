@@ -1,0 +1,193 @@
+<!doctype html>
+<!--
+  Doc-budget report template.
+  Copy to docs/metrics/doc-budget/<date>.html, then:
+    1. Run references/measure_docs.py --json out.json and paste its object as DATA.
+    2. Fill DATA.meta (date, commit) and DATA.suggestions (ranked).
+  Everything renders from DATA; the markup below needs no edits.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentation Budget</title>
+<style>
+  :root {
+    --surface-1: #fcfcfb; --plane: #f9f9f7;
+    --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
+    --grid: #e1e0d9; --baseline: #c3c2b7;
+    --bar: #2a78d6;
+    --good: #0ca30c; --warn: #fab219; --crit: #d03b3b;
+    --ring: rgba(11,11,11,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #1a1a19; --plane: #0d0d0d;
+      --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+      --grid: #2c2c2a; --baseline: #383835;
+      --bar: #3987e5;
+      --ring: rgba(255,255,255,0.10);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--plane); color: var(--ink-1);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 2rem 1rem;
+  }
+  main { max-width: 62rem; margin: 0 auto; display: grid; gap: 1.25rem; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.05rem; margin-bottom: .75rem; }
+  .sub { color: var(--ink-2); font-size: .9rem; }
+  section.card {
+    background: var(--surface-1); border: 1px solid var(--ring);
+    border-radius: .75rem; padding: 1.25rem;
+  }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; }
+  .tile { background: var(--surface-1); border: 1px solid var(--ring); border-radius: .75rem; padding: 1rem; }
+  .tile .value { font-size: 1.9rem; font-weight: 650; }
+  .tile .label { color: var(--ink-2); font-size: .85rem; }
+  .tile .note { color: var(--ink-muted); font-size: .8rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  th { text-align: left; color: var(--ink-muted); font-weight: 500; padding: .3rem .5rem; border-bottom: 1px solid var(--grid); }
+  td { padding: .3rem .5rem; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .barwrap { position: relative; height: 14px; min-width: 9rem; }
+  .bar { position: absolute; inset: 3px auto 3px 0; background: var(--bar); border-radius: 0 4px 4px 0; }
+  .tick { position: absolute; top: -2px; bottom: -2px; width: 2px; }
+  .tick.target { background: var(--warn); }
+  .tick.max { background: var(--crit); }
+  .chip { display: inline-block; font-size: .72rem; padding: 0 .45rem; border-radius: .6rem; border: 1px solid; white-space: nowrap; margin-right: .2rem; }
+  .chip.ok { color: var(--good); border-color: var(--good); }
+  .chip.warnc { color: var(--warn); border-color: var(--warn); }
+  .chip.critc { color: var(--crit); border-color: var(--crit); }
+  .legend { display: flex; gap: 1.25rem; color: var(--ink-2); font-size: .8rem; margin-top: .6rem; flex-wrap: wrap; }
+  .legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: .35rem; }
+  ol.suggestions { padding-left: 1.25rem; display: grid; gap: .6rem; }
+  ol.suggestions b { display: block; }
+  ol.suggestions .impact { color: var(--ink-muted); font-size: .82rem; }
+  footer { color: var(--ink-muted); font-size: .8rem; }
+  .scroll { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <hgroup>
+    <h1>Documentation Budget</h1>
+    <p class="sub" id="meta"></p>
+  </hgroup>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section class="card">
+    <h2>Read-class model</h2>
+    <p class="sub" id="model"></p>
+  </section>
+
+  <section class="card">
+    <h2>Tier A — wake-path docs (token budget)</h2>
+    <div class="scroll"><table id="tier-a"></table></div>
+    <div class="legend" id="tier-a-legend"></div>
+  </section>
+
+  <section class="card">
+    <h2>Tier B — basis docs (staleness and duplication budget)</h2>
+    <div class="scroll"><table id="tier-b"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Tier C — archival (marker only)</h2>
+    <div class="scroll"><table id="tier-c"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Suggestions</h2>
+    <ol class="suggestions" id="suggestions"></ol>
+  </section>
+
+  <footer>
+    Method: fact density is the share of sentences carrying a path, command,
+    or checkable value; dead refs are path references that no longer resolve;
+    duplication is a sentence owned first by another file. The doc-razor
+    bucket audit is judgment applied on top of these mechanics. Produced by
+    $doc-budget.
+  </footer>
+</main>
+
+<script>
+const DATA = /* paste measure_docs.py JSON here, then add meta + suggestions */ {
+  meta: { date: "YYYY-MM-DD", commit: "<short-sha>" },
+  budgets: {}, wake_path_docs: [], docs: {},
+  suggestions: [
+    { title: "Example", detail: "What to change and where.", impact: "words removed / drift risk closed" }
+  ]
+};
+
+const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const FLAG = {
+  "over-token-max": ["critc", "✕ over max"],
+  "over-token-target": ["warnc", "⚠ over target"],
+  "stale": ["critc", "✕ stale refs"],
+  "duplication": ["warnc", "⚠ duplication"],
+};
+const chips = r => r.flags.length
+  ? r.flags.map(f => `<span class="chip ${FLAG[f][0]}">${FLAG[f][1]}</span>`).join("")
+  : `<span class="chip ok">✓ ok</span>`;
+
+function render() {
+  const b = DATA.budgets;
+  const docs = Object.entries(DATA.docs);
+  const tier = t => docs.filter(([, v]) => v.tier === t);
+
+  document.getElementById("meta").textContent =
+    `${DATA.meta.date} · ${DATA.meta.commit} · project documentation`;
+  document.getElementById("model").innerHTML =
+    `<b>A wake-path</b>: loaded by a skill/agent/heartbeat every run — token target
+     ≤${b.tier_a_tokens.target}, max ${b.tier_a_tokens.max}. <b>B basis</b>: acceptance
+     is re-derived from these — no size cap, zero dead refs, one owner per rule.
+     <b>C archival</b>: marked scratchpad/source material — exempt except the marker.`;
+
+  const a = tier("A"), bd = tier("B"), c = tier("C");
+  const wakeTokens = a.reduce((s, [, v]) => s + v.tokens, 0);
+  const staleDocs = docs.filter(([, v]) => v.flags.includes("stale")).length;
+  const dupDocs = docs.filter(([, v]) => v.flags.includes("duplication")).length;
+  document.getElementById("tiles").innerHTML = [
+    { v: wakeTokens, l: "wake-path tokens (Tier A)", n: `${a.length} doc(s) read every run` },
+    { v: staleDocs, l: "docs with dead references", n: "budget is zero" },
+    { v: dupDocs, l: "docs with duplication flags", n: "one owner per rule" },
+    { v: `${a.length}/${bd.length}/${c.length}`, l: "docs by tier A/B/C", n: `${docs.length} docs audited` },
+  ].map(t => `<div class="tile"><div class="value">${t.v}</div><div class="label">${t.l}</div><div class="note">${t.n}</div></div>`).join("");
+
+  const scale = Math.max(b.tier_a_tokens.max, ...a.map(([, v]) => v.tokens)) * 1.1;
+  document.getElementById("tier-a").innerHTML =
+    `<tr><th>doc</th><th></th><th class="num">~tokens</th><th class="num">words</th><th class="num">dead</th><th>status</th></tr>` +
+    a.sort((x, y) => y[1].tokens - x[1].tokens).map(([k, v]) =>
+      `<tr><td>${esc(k)}</td>
+       <td><div class="barwrap"><div class="bar" style="width:${(v.tokens / scale * 100).toFixed(1)}%"></div>
+         <div class="tick target" style="left:${(b.tier_a_tokens.target / scale * 100).toFixed(1)}%"></div>
+         <div class="tick max" style="left:${(b.tier_a_tokens.max / scale * 100).toFixed(1)}%"></div></div></td>
+       <td class="num">${v.tokens}</td><td class="num">${v.words}</td>
+       <td class="num">${v.dead_refs.length}</td><td>${chips(v)}</td></tr>`).join("");
+  document.getElementById("tier-a-legend").innerHTML = `
+    <span><span class="swatch" style="background:var(--bar)"></span>tokens</span>
+    <span><span class="swatch" style="background:var(--warn)"></span>target ${b.tier_a_tokens.target}</span>
+    <span><span class="swatch" style="background:var(--crit)"></span>max ${b.tier_a_tokens.max}</span>`;
+
+  document.getElementById("tier-b").innerHTML =
+    `<tr><th>doc</th><th class="num">words</th><th class="num">density</th><th class="num">dead</th><th>duplicated in</th><th>status</th></tr>` +
+    bd.sort((x, y) => y[1].words - x[1].words).map(([k, v]) =>
+      `<tr><td>${esc(k)}</td><td class="num">${v.words}</td><td class="num">${v.fact_density.toFixed(2)}</td>
+       <td class="num">${v.dead_refs.length}</td><td class="sub">${v.duplicated_in.map(esc).join(", ") || "—"}</td>
+       <td>${chips(v)}</td></tr>`).join("");
+
+  document.getElementById("tier-c").innerHTML =
+    `<tr><th>doc</th><th class="num">words</th><th>note</th></tr>` +
+    c.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${v.words}</td><td class="sub">marked archival — exempt</td></tr>`).join("");
+
+  document.getElementById("suggestions").innerHTML = DATA.suggestions.map(s =>
+    `<li><b>${esc(s.title)}</b>${esc(s.detail)} <span class="impact">${esc(s.impact)}</span></li>`).join("");
+}
+render();
+</script>
+</body>
+</html>

@@ -21,7 +21,9 @@ and provider formats with Claude Code Markdown.
 | checking | `checking` | Generalized |
 | chief-of-staff | `chief-of-staff` | Generalized heartbeat coordinator |
 | comms | `comms` | Generalized external communication contract |
+| doc-budget | `doc-budget` | Generalized documentation budget audit |
 | grading | `grading` | Generalized session and artifact rubric |
+| instruction-budget | `instruction-budget` | Generalized static instruction budget audit |
 | maestro | `maestro` | Retained as the manual `/maestro <Jira-key>` front door |
 | planning | `planning` | Generalized with Jira issue workspaces |
 | simplify-skill | `simplify-skill` | Generalized removal accounting |
