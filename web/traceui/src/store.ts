@@ -1,6 +1,6 @@
 import { batch, computed, type ReadonlySignal, signal } from "@preact/signals";
 import { fetchSessions } from "./api.ts";
-import type { RootSummary, SessionNode } from "./contract.gen.ts";
+import type { RootSummary, SessionNode, Totals } from "./contract.gen.ts";
 import { agentsSpawned, parseTs, rowRuntimeMs, totalTokens } from "./format.ts";
 
 export type SortKey = "recent" | "runtime" | "tokens" | "agents";
@@ -67,6 +67,10 @@ function clearDetailNode(rootId: string): void {
 
 const rowById = new Map<string, RootSummary>();
 export const rows = signal<RootSummary[]>([]);
+// Dataset-wide aggregates reported by the API on every page. The overview reads
+// these so its Sessions and token counts reflect the whole dataset, not the
+// pages loaded so far.
+export const datasetTotals = signal<Totals | null>(null);
 export const nextCursor = signal<string | null>(null);
 export const loading = signal(false);
 export const initialLoaded = signal(false);
@@ -176,17 +180,30 @@ export interface Summary {
 }
 
 export const summary: ReadonlySignal<Summary> = computed(() => {
-  let tokens = 0;
+  let loadedTokens = 0;
   let agents = 0;
   let busiest: RootSummary | null = null;
   for (const session of rows.value) {
     const sessionTokens = totalTokens(session);
-    tokens += sessionTokens;
+    loadedTokens += sessionTokens;
     agents += agentsSpawned(session);
     if (!busiest || sessionTokens > totalTokens(busiest)) busiest = session;
   }
-  return { count: rows.value.length, tokens, agents, busiest };
+  // Sessions and tokens are dataset-wide when the API reports totals, so they
+  // stay correct before pagination loads every row. Agents and busiest describe
+  // the loaded rows; the API does not aggregate them.
+  const totals = datasetTotals.value;
+  return {
+    count: totals ? totals.sessions : rows.value.length,
+    tokens: totals ? totals.total_tokens : loadedTokens,
+    agents,
+    busiest,
+  };
 });
+
+function noteTotals(totals: Totals | undefined | null): void {
+  if (totals) datasetTotals.value = totals;
+}
 
 function noteAsOf(asOf: string): void {
   const parsed = parseTs(asOf);
@@ -199,12 +216,14 @@ function noteAsOf(asOf: string): void {
 export function seedBootstrap(
   sessions: RootSummary[],
   cursor: string | null,
+  totals: Totals | null,
   asOf: string,
 ): void {
   noteAsOf(asOf);
   batch(() => {
     mergeRows(sessions);
     publishRows();
+    noteTotals(totals);
     nextCursor.value = cursor;
     initialLoaded.value = true;
   });
@@ -229,6 +248,7 @@ async function loadPage(cursor: string | undefined): Promise<void> {
     batch(() => {
       mergeRows(response.sessions);
       publishRows();
+      noteTotals(response.totals);
       nextCursor.value = response.next_cursor;
       initialLoaded.value = true;
       errorText.value = undefined;
@@ -253,6 +273,7 @@ export async function refreshTop(asOf: string): Promise<void> {
       replaceRows(response.sessions);
       goneIds.clear();
       publishRows();
+      noteTotals(response.totals);
       nextCursor.value = response.next_cursor;
       errorText.value = undefined;
     });

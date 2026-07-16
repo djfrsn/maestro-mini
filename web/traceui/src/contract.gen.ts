@@ -19,9 +19,16 @@ export interface RootSummary {
   confidence: string;
 }
 
+export interface Totals {
+  sessions: number;
+  active: number;
+  total_tokens: number;
+}
+
 export interface SessionsResponse {
   sessions: RootSummary[];
   next_cursor: string | null;
+  totals: Totals;
 }
 
 export interface SessionNode {
