@@ -216,6 +216,7 @@ def validate_links_and_private_terms(validation: Validation) -> None:
         if (
             not path.is_file()
             or ".git" in path.parts
+            or ".worktrees" in path.parts
             or "node_modules" in path.parts
             or ("web" in path.parts and "traceui" in path.parts and "dist" in path.parts)
         ):

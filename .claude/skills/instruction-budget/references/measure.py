@@ -18,8 +18,10 @@ import sys
 from pathlib import Path
 
 SLICE_BUDGET = 25
-SKILL_SWEET, SKILL_TARGET, SKILL_MAX = 20, 25, 30
-LOAD_SWEET, LOAD_TARGET, LOAD_MAX = 30, 40, 50
+BASELINE_SWEET, BASELINE_TARGET, BASELINE_MAX = 5, 10, 15
+AGENT_SWEET, AGENT_TARGET, AGENT_MAX = 10, 15, 20
+SKILL_SWEET, SKILL_TARGET, SKILL_MAX = 20, 35, 50
+LOAD_SWEET, LOAD_TARGET, LOAD_MAX = 30, 50, 75
 RUN_BUDGET_LOW, RUN_BUDGET_HIGH = 100, 150
 RATIO_TARGET = round(LOAD_TARGET / SLICE_BUDGET, 2)
 
@@ -80,10 +82,24 @@ def discover_files(root: Path) -> dict[str, dict[str, int | str]]:
     for name in ("AGENTS.md", "CLAUDE.md"):
         path = root / name
         if path.exists():
-            files[name] = measure_file(path)
+            measurement: dict[str, int | str] = measure_file(path)
+            measurement["status"] = status(
+                int(measurement["instructions"]),
+                BASELINE_SWEET,
+                BASELINE_TARGET,
+                BASELINE_MAX,
+            )
+            files[name] = measurement
 
     for path in sorted((root / ".claude" / "agents").glob("*.md")):
-        files[f"agent/{path.stem}"] = measure_file(path)
+        measurement = measure_file(path)
+        measurement["status"] = status(
+            int(measurement["instructions"]),
+            AGENT_SWEET,
+            AGENT_TARGET,
+            AGENT_MAX,
+        )
+        files[f"agent/{path.stem}"] = measurement
 
     for path in sorted((root / ".claude" / "skills").glob("*/SKILL.md")):
         measurement: dict[str, int | str] = measure_file(path)
@@ -112,7 +128,12 @@ def main() -> int:
     root = args.root.resolve()
     files = discover_files(root)
 
-    base = [name for name in ("AGENTS.md", "CLAUDE.md") if name in files]
+    baseline = (
+        "CLAUDE.md"
+        if "CLAUDE.md" in files
+        else "AGENTS.md" if "AGENTS.md" in files else None
+    )
+    baseline_parts = [baseline] if baseline else []
 
     def combine(parts: list[str]) -> dict[str, object] | None:
         if any(part not in files for part in parts):
@@ -128,7 +149,9 @@ def main() -> int:
         for skills in skill_sets:
             name = role + ("+" + "+".join(skills) if skills else "")
             combined = combine(
-                base + [f"agent/{role}"] + [f"skill/{skill}" for skill in skills]
+                baseline_parts
+                + [f"agent/{role}"]
+                + [f"skill/{skill}" for skill in skills]
             )
             if combined is None:
                 continue
@@ -157,6 +180,16 @@ def main() -> int:
     report = {
         "budgets": {
             "slice": SLICE_BUDGET,
+            "baseline": {
+                "sweet": BASELINE_SWEET,
+                "target": BASELINE_TARGET,
+                "max": BASELINE_MAX,
+            },
+            "agent": {
+                "sweet": AGENT_SWEET,
+                "target": AGENT_TARGET,
+                "max": AGENT_MAX,
+            },
             "skill": {
                 "sweet": SKILL_SWEET,
                 "target": SKILL_TARGET,
@@ -170,6 +203,7 @@ def main() -> int:
             "run": {"low": RUN_BUDGET_LOW, "high": RUN_BUDGET_HIGH},
             "ratio_target": RATIO_TARGET,
         },
+        "doctrine_baseline": baseline,
         "files": files,
         "loads": loads,
         "chains": chains,

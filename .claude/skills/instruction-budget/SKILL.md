@@ -10,24 +10,29 @@ Measure each static instruction layer, compare it with the project budgets, and
 render one HTML report with ranked suggestions.
 
 Treat a sentence outside code blocks and frontmatter as one instruction and
-estimate tokens as characters divided by four. Use these default budgets:
+estimate tokens as characters divided by four. Use these budgets:
 
-- skill file: sweet spot 20 instructions, target 25, maximum 30;
-- session doctrine: sweet spot 30 instructions, target 40, maximum 50;
+- repository instruction file (`AGENTS.md` or `CLAUDE.md`): sweet spot 5
+  instructions, target 10, maximum 15;
+- canonical agent file: sweet spot 10 instructions, target 15, maximum 20;
+- skill file: sweet spot 20 instructions, target 35, maximum 50;
+- full session doctrine: sweet spot 30 instructions, target 50, maximum 75;
 - execution slice: 25 instructions;
 - full run: 100–150 instructions before reliability degrades.
 
-Keep execution-session doctrine-to-slice overhead at or below 1.6:1. Treat
-chain totals as a cross-context trend gauge.
+Measure `AGENTS.md` and `CLAUDE.md` independently and use only the active
+provider baseline in each doctrine load. Keep execution-session
+doctrine-to-slice overhead at or below 2:1. Treat chain totals as a
+cross-context trend gauge.
 
 Run `python3 <skill>/references/measure.py --root <project> --json <output>`.
 Update the role-to-skill and chain maps when the project routes work differently.
 
 Copy `references/report-template.html` to the project's metrics directory,
 defaulting to `docs/metrics/instruction-budget/<date>.html`. Add the measurement
-data, date, baseline commit, and ranked suggestions. Rank budget breaches first,
-near-limit components second, and duplicated rules third; name the concrete edit
-and projected savings for each suggestion.
+data, date, baseline commit, and ranked suggestions. Rank `over` components
+first, `near` components second, and duplicated rules third; name the concrete
+edit and projected savings for each suggestion.
 
 Compare the report with its predecessor and explain meaningful movement. Render
 the HTML in a browser and reconcile its tiles, bars, and tables with command
