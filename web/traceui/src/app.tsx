@@ -46,6 +46,7 @@ function boot(): () => void {
     seedBootstrap(
       bootstrap.sessions,
       bootstrap.next_cursor,
+      bootstrap.totals ?? null,
       new Date().toISOString(),
     );
   } else {
