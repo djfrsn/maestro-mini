@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn"
+  },
+  "rules": {
+    "react/no-danger": "error",
+    "react/react-in-jsx-scope": "off"
+  },
+  "ignorePatterns": ["src/**/*.gen.ts"],
+  "settings": {
+    "react": { "runtime": "automatic" }
+  },
+  "env": {
+    "browser": true,
+    "es2022": true
+  }
+}

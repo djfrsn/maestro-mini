@@ -213,7 +213,12 @@ def validate_source_map(
 
 def validate_links_and_private_terms(validation: Validation) -> None:
     for path in sorted(ROOT.rglob("*")):
-        if not path.is_file() or ".git" in path.parts:
+        if (
+            not path.is_file()
+            or ".git" in path.parts
+            or "node_modules" in path.parts
+            or ("web" in path.parts and "traceui" in path.parts and "dist" in path.parts)
+        ):
             continue
         if path.resolve() == Path(__file__).resolve():
             continue

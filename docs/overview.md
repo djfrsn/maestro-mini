@@ -79,6 +79,12 @@ The validator checks package shape, unique names, required frontmatter,
 command coverage, generated adapters, relative links, and publication
 guardrails.
 
+### Publication provenance
+
+The [TraceUI provenance receipt](traceui/provenance.md) records the extraction
+baseline, source publication authority, font redistribution licenses, and the
+synthetic-fixture review.
+
 ## Shared contracts
 
 ### Ticket intake

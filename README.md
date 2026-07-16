@@ -12,6 +12,7 @@ The repository supplies:
 - scheduled-task prompts in `heartbeats/`;
 - a cross-platform command registry in `text-replacements/`;
 - a Jira-centered work-item workflow that uses an existing Atlassian MCP;
+- a local, read-only browser viewer for native Claude Code sessions; and
 - a dependency-free validator runnable from the command line.
 
 It is designed to sit on top of an existing engineering environment. Jira owns
@@ -42,6 +43,19 @@ merges.
 4. Start with `/maestro PROJ-123`.
 
 Run `make validate` before sharing local changes.
+
+## View Claude sessions
+
+Start the embedded session viewer from a clone with Go installed:
+
+```sh
+go run ./cmd/traceui
+```
+
+It listens on loopback, reads native Claude Code history, and prints the local
+browser URL. The viewer is Claude-only and contains no telemetry or GB Events
+surface. See [docs/traceui.md](docs/traceui.md) for root selection, installation,
+privacy, frontend development, and troubleshooting.
 
 ## Core loop
 

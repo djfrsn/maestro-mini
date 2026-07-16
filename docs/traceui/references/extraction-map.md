@@ -82,7 +82,7 @@ generated bundles use the portable TraceUI vocabulary.
 
 ## Provenance receipt
 
-Before extraction begins, record:
+The [TraceUI provenance receipt](../provenance.md) records:
 
 - ownership or license basis for the Go and TypeScript source;
 - the license and redistribution basis for each font;

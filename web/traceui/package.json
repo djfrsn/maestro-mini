@@ -1,0 +1,31 @@
+{
+  "name": "traceui-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Portable Claude Code session TraceUI frontend.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "typecheck": "tsgo --noEmit -p tsconfig.json && tsgo --noEmit -p tsconfig.test.json",
+    "lint": "oxlint --config .oxlintrc.json src && oxlint --type-aware --config .oxlintrc.type-aware.json src",
+    "invariants": "node invariants.mjs",
+    "test": "node --experimental-strip-types --test 'src/**/*.test.ts'",
+    "format": "biome format --write src",
+    "format:check": "biome format src",
+    "check": "npm run typecheck && npm run lint && npm run invariants && npm run format:check && npm run test",
+    "gen": "npm run build && npm run check"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.9.4",
+    "preact": "^10.26.4"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
+    "@types/node": "^26.1.1",
+    "@typescript/native-preview": "^7.0.0-dev.20250710.1",
+    "esbuild": "^0.25.0",
+    "oxlint": "^1.0.0",
+    "oxlint-tsgolint": "^0.24.0"
+  }
+}
