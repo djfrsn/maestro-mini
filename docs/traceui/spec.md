@@ -130,11 +130,11 @@ usage counters, and bounds malformed input with contextual errors.
 Native Claude records remain authoritative. Derived list and tree data lives
 in memory and is rebuilt from those files. Conversation text is read from the
 owning file for the detail response and remains outside derived persistence.
-An unfinished session remains active for 15 minutes after its latest file
-write. When that activity lease expires, list, tree, and detail views report it
-as aborted with `ended_at` set to the last-write time. An unchanged poll makes
-this transition from cached metadata and emits a refresh without rereading the
-JSONL file.
+An unfinished session remains active for 15 minutes after the final timestamped
+native record. When that activity lease expires, list, tree, and detail views
+report it as aborted with `ended_at` set to that record's timestamp. An
+unchanged poll makes this transition from cached metadata and emits a refresh
+without rereading the JSONL file.
 Claude Code may remove native files under its configured retention policy; the
 next successful refresh reconciles the view to the surviving source files.
 
@@ -201,8 +201,9 @@ correlation, and additional provider implementations are later decisions.
   and updates every open resource in place.
 - An unchanged poll performs no full reparse and emits an invalidation when an
   unfinished session's 15-minute activity lease expires.
-- Stale unfinished sessions are aborted at their source file's last-write time
-  consistently across list, tree, and detail responses.
+- Stale unfinished sessions are aborted at the final native record timestamp
+  consistently across list, tree, and detail responses, even when the source
+  file has a recent modification time.
 - A malformed file remains visible with a bounded diagnostic and cannot block
   healthy sessions from refreshing.
 - Removing a native source file removes its session on the next successful

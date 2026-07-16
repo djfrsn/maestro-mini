@@ -160,9 +160,9 @@ func (claudeProvider) ParseFile(path string) (Record, error) {
 	aliases := map[string]bool{}
 	pending := map[string]ChildSpawn{}
 	children := map[string]bool{}
-	var lastAt time.Time
+	var lastAt, interruptedAt time.Time
 	var stop string
-	sawAssistant, pendingPrompt := false, false
+	sawAssistant, pendingPrompt, interrupted := false, false, false
 	for s.Scan() {
 		lineNo++
 		if len(bytes.TrimSpace(s.Bytes())) == 0 {
@@ -210,6 +210,7 @@ func (claudeProvider) ParseFile(path string) (Record, error) {
 		case "assistant":
 			sawAssistant = true
 			pendingPrompt = false
+			interrupted = false
 			if line.Message == nil {
 				continue
 			}
@@ -239,7 +240,16 @@ func (claudeProvider) ParseFile(path string) (Record, error) {
 			}
 		case "user":
 			rec.Events = append(rec.Events, Event{Kind: "native:user", At: at, Ref: ref})
+			if line.Message != nil && isClaudeInterruptMarker(line.Message.Content) {
+				interrupted = true
+				interruptedAt = at
+				pendingPrompt = false
+				continue
+			}
 			pendingPrompt = submittedPrompt(line)
+			if pendingPrompt {
+				interrupted = false
+			}
 			if line.Message == nil {
 				continue
 			}
@@ -278,16 +288,58 @@ func (claudeProvider) ParseFile(path string) (Record, error) {
 		addError(&rec, "no Claude session records found")
 		return rec, fmt.Errorf("session: %s: empty Claude session", path)
 	}
-	if pendingPrompt || (sawAssistant && !isTerminalClaudeStopReason(stop)) {
+	switch {
+	case interrupted:
+		rec.Status = StatusAborted
+		ended := interruptedAt
+		if ended.IsZero() {
+			ended = lastAt
+		}
+		if !ended.IsZero() {
+			rec.EndedAt = &ended
+		}
+	case pendingPrompt || (sawAssistant && !isTerminalClaudeStopReason(stop)):
 		rec.Status = StatusActive
-	} else {
+	default:
 		rec.Status = StatusCompleted
 		if !lastAt.IsZero() {
 			ended := lastAt
 			rec.EndedAt = &ended
 		}
 	}
+	if !lastAt.IsZero() {
+		activity := lastAt
+		rec.LastActivityAt = &activity
+	}
 	return rec, nil
+}
+
+const (
+	claudeUserInterrupt    = "[Request interrupted by user]"
+	claudeToolUseInterrupt = "[Request interrupted by user for tool use]"
+)
+
+func isClaudeInterruptMarker(content json.RawMessage) bool {
+	text, ok := claudeSoleText(content)
+	return ok && (text == claudeUserInterrupt || text == claudeToolUseInterrupt)
+}
+
+func claudeSoleText(content json.RawMessage) (string, bool) {
+	if len(content) == 0 {
+		return "", false
+	}
+	if content[0] == '"' {
+		var text string
+		if err := json.Unmarshal(content, &text); err != nil {
+			return "", false
+		}
+		return strings.TrimSpace(text), true
+	}
+	items := contentItems(content)
+	if len(items) != 1 || items[0].Type != "text" {
+		return "", false
+	}
+	return strings.TrimSpace(items[0].Text), true
 }
 
 func isTerminalClaudeStopReason(stopReason string) bool {
@@ -301,7 +353,7 @@ func isTerminalClaudeStopReason(stopReason string) bool {
 
 func (provider claudeProvider) Summarize(path string) (FileSummary, error) {
 	rec, err := provider.ParseFile(path)
-	return FileSummary{Meta: rec.Meta, Status: rec.Status, EndedAt: rec.EndedAt, Model: rec.Meta.Model, Usage: rec.Usage, Confidence: rec.Confidence, Errors: rec.Errors}, err
+	return FileSummary{Meta: rec.Meta, Status: rec.Status, EndedAt: rec.EndedAt, LastActivityAt: rec.LastActivityAt, Model: rec.Meta.Model, Usage: rec.Usage, Confidence: rec.Confidence, Errors: rec.Errors}, err
 }
 
 func contentItems(raw json.RawMessage) []nativeItem {

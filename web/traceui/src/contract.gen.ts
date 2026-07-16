@@ -21,7 +21,7 @@ export interface RootSummary {
 
 export interface Totals {
   sessions: number;
-  active: number;
+  agents: number;
   total_tokens: number;
 }
 

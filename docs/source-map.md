@@ -51,4 +51,6 @@ entry can be generated for Windows and macOS without becoming a Claude skill.
 TraceUI was extracted from Maestro commit
 `955e60083abf55b556b2c26e159e3e8cc8340383`. Its original UI baseline is
 `internal/traceui/web-v1/src`; the detailed source-to-target mapping remains in
-the [extraction map](traceui/references/extraction-map.md).
+the [extraction map](traceui/references/extraction-map.md). Portable lifecycle,
+virtualization, totals, and refresh corrections were subsequently adapted from
+the commits recorded in the [provenance receipt](traceui/provenance.md).

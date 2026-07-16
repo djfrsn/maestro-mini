@@ -8,6 +8,11 @@
 // Layout is a top spacer, the window rows in normal flow, then a bottom spacer
 // — no absolute positioning — and each row keeps a stable ref callback per key,
 // so Preact's keyed diff never orphans a removed row.
+//
+// Mounted rows are re-measured on every viewport pass. A ref callback only
+// runs on mount and unmount, so an in-place expansion would otherwise retain
+// its collapsed height. That stale height can put the expanded row outside its
+// own virtual window, unmounting its waterfall and snapping the page upward.
 import { type JSX } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 
@@ -66,6 +71,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): JSX.Element {
   const refCache = useRef<Map<string, (el: HTMLDivElement | null) => void>>(
     new Map(),
   );
+  const elByKey = useRef<Map<string, HTMLDivElement>>(new Map());
   const [metrics, setMetrics] = useState<ViewMetrics>({
     scrollY: 0,
     viewportH: typeof window !== "undefined" ? window.innerHeight : 800,
@@ -77,7 +83,26 @@ export function VirtualList<T>(props: VirtualListProps<T>): JSX.Element {
 
   const keys = items.map(itemKey);
 
-  // readMetrics re-measures the viewport against the container. The functional
+  // Every measurement path uses the same change guard so polling a stable row
+  // cannot cause a render loop.
+  const noteHeight = (key: string, el: Element): boolean => {
+    const height = el.getBoundingClientRect().height;
+    if (height > 0 && heightsRef.current.get(key) !== height) {
+      heightsRef.current.set(key, height);
+      return true;
+    }
+    return false;
+  };
+
+  const syncHeights = (): boolean => {
+    let changed = false;
+    for (const [key, el] of elByKey.current) {
+      if (noteHeight(key, el)) changed = true;
+    }
+    return changed;
+  };
+
+  // readMetrics re-measures the viewport and every mounted row. The functional
   // update returns the previous object unchanged when nothing moved, so Preact
   // bails out — the idle poll below costs nothing when the user is still.
   const readMetrics = (): void => {
@@ -91,6 +116,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): JSX.Element {
       viewportH: window.innerHeight,
       containerTop: rect.top + window.scrollY,
     };
+    if (syncHeights()) bumpMeasure((value) => value + 1);
     setMetrics((prev) =>
       prev.scrollY === next.scrollY &&
       prev.viewportH === next.viewportH &&
@@ -166,17 +192,18 @@ export function VirtualList<T>(props: VirtualListProps<T>): JSX.Element {
   const visible = items.slice(start, end);
 
   // measureRef returns a stable callback per key, so Preact never sees a
-  // changing ref and never orphans a removed row.
+  // changing ref and never orphans a removed row. Mounted elements are retained
+  // only while visible so viewport passes can re-measure in-place expansions.
   const measureRef = (key: string): ((el: HTMLDivElement | null) => void) => {
     let cb = refCache.current.get(key);
     if (!cb) {
       cb = (el: HTMLDivElement | null): void => {
         if (!el) {
+          elByKey.current.delete(key);
           return;
         }
-        const h = el.getBoundingClientRect().height;
-        if (h > 0 && heightsRef.current.get(key) !== h) {
-          heightsRef.current.set(key, h);
+        elByKey.current.set(key, el);
+        if (noteHeight(key, el)) {
           bumpMeasure((v) => v + 1);
         }
       };

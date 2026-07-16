@@ -12,7 +12,7 @@ import (
 
 // activeSessionLease is the operational window in which an unfinished
 // session file is considered running. Claude JSONL does not expose shared
-// process status, so the append-only file mtime is the activity signal.
+// process status, so its final native record is the durable activity signal.
 const activeSessionLease = 15 * time.Minute
 
 type RootSummary struct {
@@ -129,7 +129,7 @@ func (cache *cache) refresh(now time.Time) (bool, error) {
 				tree.Walk(func(*session.Node) { nodeCount++ })
 			}
 		}
-		status, endedAt := operationalState(summary, state.mtime, now)
+		status, endedAt := operationalState(summary, now)
 		rows = append(rows, RootSummary{Provider: cache.provider.Name(), SessionID: id, StartedAt: started, EndedAt: endedAt, Status: status, Model: summary.Model, Usage: usage, NodeCount: nodeCount, SourcePath: path, Confidence: summary.Confidence})
 	}
 	sort.Slice(rows, func(i, j int) bool {
@@ -160,7 +160,7 @@ func (cache *cache) refreshOperationalState(now time.Time) bool {
 		if !ok {
 			continue
 		}
-		status, endedAt := operationalState(state.summary, state.mtime, now)
+		status, endedAt := operationalState(state.summary, now)
 		if row.Status == status && equalTimes(row.EndedAt, endedAt) {
 			continue
 		}
@@ -176,18 +176,21 @@ func (cache *cache) refreshOperationalState(now time.Time) bool {
 	return changed
 }
 
-// operationalState closes an unfinished session after its source file has
-// received no writes for one lease. The last write is the best available end
-// time for an interrupted run.
-func operationalState(summary session.FileSummary, mtimeNanos int64, asOf time.Time) (session.Status, *time.Time) {
+// operationalState closes an unfinished session after its final native record
+// has aged past one lease. Claude can rewrite an old file, so filesystem mtime
+// is not a reliable sign that the session is still alive.
+func operationalState(summary session.FileSummary, asOf time.Time) (session.Status, *time.Time) {
 	if summary.Status != session.StatusActive || summary.EndedAt != nil {
 		return summary.Status, utcTime(summary.EndedAt)
 	}
-	lastWrite := time.Unix(0, mtimeNanos).UTC()
-	if asOf.Sub(lastWrite) <= activeSessionLease {
+	if summary.LastActivityAt == nil {
+		return summary.Status, nil
+	}
+	lastActivity := summary.LastActivityAt.UTC()
+	if asOf.Sub(lastActivity) <= activeSessionLease {
 		return session.StatusActive, nil
 	}
-	return session.StatusAborted, &lastWrite
+	return session.StatusAborted, &lastActivity
 }
 
 func equalTimes(left, right *time.Time) bool {
@@ -216,7 +219,7 @@ func (snap snapshot) projectOperationalRecord(record *session.Record) {
 	if !ok {
 		return
 	}
-	record.Status, record.EndedAt = operationalState(state.summary, state.mtime, snap.asOf)
+	record.Status, record.EndedAt = operationalState(state.summary, snap.asOf)
 }
 
 func (snap snapshot) projectOperationalTree(tree session.Tree) {
@@ -228,7 +231,7 @@ func (snap snapshot) projectOperationalTree(tree session.Tree) {
 		if !ok {
 			return
 		}
-		node.Status, node.EndedAt = operationalState(state.summary, state.mtime, snap.asOf)
+		node.Status, node.EndedAt = operationalState(state.summary, snap.asOf)
 	})
 }
 

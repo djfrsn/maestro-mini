@@ -1,5 +1,5 @@
 import { batch, computed, type ReadonlySignal, signal } from "@preact/signals";
-import { fetchSessions } from "./api.ts";
+import { fetchSessions, fetchTree, isSessionGone } from "./api.ts";
 import type { RootSummary, SessionNode, Totals } from "./contract.gen.ts";
 import { agentsSpawned, parseTs, rowRuntimeMs, totalTokens } from "./format.ts";
 
@@ -100,14 +100,19 @@ function mergeRows(incoming: readonly RootSummary[]): void {
   }
 }
 
-function replaceRows(incoming: readonly RootSummary[]): void {
-  rowById.clear();
-  mergeRows(incoming);
-}
-
 const goneIds = new Set<string>();
 export function markSessionGone(id: string): void {
   goneIds.add(id);
+}
+
+// Drop rows already confirmed gone by an expanded tree/detail request when
+// page one does not re-confirm them. Reappearing rows survive and clear the
+// one-shot marker.
+function pruneGone(present: ReadonlySet<string>): void {
+  for (const id of goneIds) {
+    if (!present.has(id)) rowById.delete(id);
+  }
+  goneIds.clear();
 }
 
 function matchesFilter(session: RootSummary, query: string): boolean {
@@ -181,22 +186,22 @@ export interface Summary {
 
 export const summary: ReadonlySignal<Summary> = computed(() => {
   let loadedTokens = 0;
-  let agents = 0;
+  let loadedAgents = 0;
   let busiest: RootSummary | null = null;
   for (const session of rows.value) {
     const sessionTokens = totalTokens(session);
     loadedTokens += sessionTokens;
-    agents += agentsSpawned(session);
+    loadedAgents += agentsSpawned(session);
     if (!busiest || sessionTokens > totalTokens(busiest)) busiest = session;
   }
-  // Sessions and tokens are dataset-wide when the API reports totals, so they
-  // stay correct before pagination loads every row. Agents and busiest describe
-  // the loaded rows; the API does not aggregate them.
+  // Sessions, tokens, and spawned agents are dataset-wide when the API reports
+  // totals, so they stay correct before pagination loads every row. Busiest is
+  // intentionally derived from the loaded rows.
   const totals = datasetTotals.value;
   return {
     count: totals ? totals.sessions : rows.value.length,
     tokens: totals ? totals.total_tokens : loadedTokens,
-    agents,
+    agents: totals ? totals.agents : loadedAgents,
     busiest,
   };
 });
@@ -262,21 +267,62 @@ async function loadPage(cursor: string | undefined): Promise<void> {
   }
 }
 
+// Probe active rows not re-confirmed by page one. They may simply be on a later
+// page; only the tree endpoint's authoritative 404 permits pruning them.
+async function reconcileVanishedActives(
+  present: ReadonlySet<string>,
+  generation: number,
+): Promise<void> {
+  const suspects = Array.from(rowById.values()).filter(
+    (session) =>
+      session.status === "active" && !present.has(session.session_id),
+  );
+  const vanished = await Promise.all(
+    suspects.map(async (session) => {
+      try {
+        await fetchTree(session.session_id);
+        return null;
+      } catch (error) {
+        return isSessionGone(error) ? session : null;
+      }
+    }),
+  );
+  if (generation !== pageGeneration) return;
+  let changed = false;
+  for (const session of vanished) {
+    if (
+      session !== null &&
+      !present.has(session.session_id) &&
+      rowById.get(session.session_id) === session
+    ) {
+      rowById.delete(session.session_id);
+      changed = true;
+    }
+  }
+  if (changed) publishRows();
+}
+
 export async function refreshTop(asOf: string): Promise<void> {
   const refreshGeneration = ++pageGeneration;
+  noteAsOf(asOf);
   try {
     const response = await fetchSessions();
     if (refreshGeneration !== pageGeneration) return;
-    pageGeneration += 1;
+    // Invalidate cursor requests launched while page one was in flight. Their
+    // responses may describe the pre-refresh snapshot and must not overwrite
+    // the authoritative rows or dataset totals that just arrived.
+    const settledGeneration = ++pageGeneration;
+    const present = new Set(
+      response.sessions.map((session) => session.session_id),
+    );
     batch(() => {
-      noteAsOf(asOf);
-      replaceRows(response.sessions);
-      goneIds.clear();
+      mergeRows(response.sessions);
+      pruneGone(present);
       publishRows();
       noteTotals(response.totals);
-      nextCursor.value = response.next_cursor;
       errorText.value = undefined;
     });
+    await reconcileVanishedActives(present, settledGeneration);
   } catch (error) {
     if (refreshGeneration === pageGeneration) {
       errorText.value = error instanceof Error ? error.message : String(error);

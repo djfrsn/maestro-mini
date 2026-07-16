@@ -143,19 +143,17 @@ type listResponse struct {
 // bootstrap. This keeps the API and the UI in agreement regardless of paging.
 type Totals struct {
 	Sessions    int   `json:"sessions"`
-	Active      int   `json:"active"`
 	TotalTokens int64 `json:"total_tokens"`
+	Agents      int   `json:"agents"`
 }
 
 func computeTotals(rows []RootSummary) Totals {
 	result := Totals{Sessions: len(rows)}
 	for _, row := range rows {
-		if row.Status == session.StatusActive {
-			result.Active++
-		}
 		if row.Usage != nil {
 			result.TotalTokens += row.Usage.TotalTokens
 		}
+		result.Agents += max(row.NodeCount-1, 0)
 	}
 	return result
 }
