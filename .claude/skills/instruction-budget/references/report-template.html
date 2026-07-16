@@ -55,9 +55,11 @@
   .barwrap { position: relative; height: 14px; background: transparent; min-width: 10rem; }
   .bar { position: absolute; inset: 3px auto 3px 0; background: var(--bar); border-radius: 0 4px 4px 0; }
   .tick { position: absolute; top: -2px; bottom: -2px; width: 2px; }
+  .tick.sweet { background: var(--good); }
   .tick.target { background: var(--warn); }
   .tick.max { background: var(--crit); }
   .chip { display: inline-block; font-size: .75rem; padding: 0 .5rem; border-radius: .6rem; border: 1px solid; white-space: nowrap; }
+  .chip.great { color: #fff; background: var(--good); border-color: var(--good); font-weight: 650; }
   .chip.ok { color: var(--good); border-color: var(--good); }
   .chip.near { color: var(--warn); border-color: var(--warn); }
   .chip.over { color: var(--crit); border-color: var(--crit); }
@@ -128,15 +130,17 @@ const DATA = /* paste measure.py JSON here, then add meta + suggestions */ {
 };
 
 const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-const chip = s => s ? `<span class="chip ${s}">${{ ok: "✓ ok", near: "⚠ near", over: "✕ over" }[s]}</span>` : "";
-const bar = (v, scale, target, max) => `
+const chip = s => s ? `<span class="chip ${s}">${{ great: "★ great", ok: "✓ ok", near: "⚠ near", over: "✕ over" }[s]}</span>` : "";
+const bar = (v, scale, sweet, target, max) => `
   <div class="barwrap">
     <div class="bar" style="width:${(v / scale * 100).toFixed(1)}%"></div>
+    <div class="tick sweet" style="left:${(sweet / scale * 100).toFixed(1)}%"></div>
     <div class="tick target" style="left:${(target / scale * 100).toFixed(1)}%"></div>
     <div class="tick max" style="left:${(max / scale * 100).toFixed(1)}%"></div>
   </div>`;
-const legend = (target, max) => `
+const legend = (sweet, target, max) => `
   <span><span class="swatch" style="background:var(--bar)"></span>instructions</span>
+  <span><span class="swatch" style="background:var(--good)"></span>sweet spot ${sweet}</span>
   <span><span class="swatch" style="background:var(--warn)"></span>target ${target}</span>
   <span><span class="swatch" style="background:var(--crit)"></span>max ${max}</span>`;
 
@@ -147,9 +151,9 @@ function render() {
   document.getElementById("model").innerHTML =
     `Full-run instruction-following budget: <b>${b.run.low}–${b.run.high}</b>; degradation begins in
      that range and context rot compounds it. Fixed tracer-bullet slice budget: <b>${b.slice}</b>
-     available for execution work. Skill: target ≤${b.skill.target}, max ${b.skill.max}. Doctrine load:
-     target ≤${b.load.target}, max ${b.load.max}. Executing-session overhead ratio target:
-     ≤${b.ratio_target}:1, driving toward 1:1 and lower.`;
+     available for execution work. Skill: sweet spot ${b.skill.sweet}, target ≤${b.skill.target},
+     max ${b.skill.max}. Doctrine load: sweet spot ${b.load.sweet}, target ≤${b.load.target},
+     max ${b.load.max}. Executing-session overhead ratio target: ≤${b.ratio_target}:1.`;
 
   const skills = Object.entries(DATA.files).filter(([k]) => k.startsWith("skill/"));
   const loads = Object.entries(DATA.loads);
@@ -168,18 +172,18 @@ function render() {
   document.getElementById("skills").innerHTML =
     `<tr><th>skill</th><th></th><th class="num">instr</th><th class="num">~tokens</th><th>status</th></tr>` +
     skills.sort((x, y) => y[1].instructions - x[1].instructions).map(([k, v]) =>
-      `<tr><td>${esc(k.slice(6))}</td><td>${bar(v.instructions, skillScale, b.skill.target, b.skill.max)}</td>
+      `<tr><td>${esc(k.slice(6))}</td><td>${bar(v.instructions, skillScale, b.skill.sweet, b.skill.target, b.skill.max)}</td>
        <td class="num">${v.instructions}</td><td class="num">${v.tokens}</td><td>${chip(v.status)}</td></tr>`).join("");
-  document.getElementById("skills-legend").innerHTML = legend(b.skill.target, b.skill.max);
+  document.getElementById("skills-legend").innerHTML = legend(b.skill.sweet, b.skill.target, b.skill.max);
 
   const loadScale = Math.max(b.load.max, ...loads.map(([, v]) => v.instructions)) * 1.1;
   document.getElementById("loads").innerHTML =
     `<tr><th>session</th><th></th><th class="num">instr</th><th class="num">~tokens</th><th class="num">ratio</th><th>status</th></tr>` +
     loads.sort((x, y) => y[1].instructions - x[1].instructions).map(([k, v]) =>
-      `<tr><td>${esc(k)}</td><td>${bar(v.instructions, loadScale, b.load.target, b.load.max)}</td>
+      `<tr><td>${esc(k)}</td><td>${bar(v.instructions, loadScale, b.load.sweet, b.load.target, b.load.max)}</td>
        <td class="num">${v.instructions}</td><td class="num">${v.tokens}</td>
        <td class="num">${v.ratio ? v.ratio + ":1" : "—"}</td><td>${chip(v.status)}</td></tr>`).join("");
-  document.getElementById("loads-legend").innerHTML = legend(b.load.target, b.load.max);
+  document.getElementById("loads-legend").innerHTML = legend(b.load.sweet, b.load.target, b.load.max);
 
   document.getElementById("chains").innerHTML =
     `<tr><th>chain</th><th>hops</th><th class="num">instr</th><th class="num">~tokens</th></tr>` +

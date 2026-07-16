@@ -18,10 +18,10 @@ import sys
 from pathlib import Path
 
 SLICE_BUDGET = 25
-SKILL_TARGET, SKILL_MAX = 25, 30
-LOAD_TARGET, LOAD_MAX = 30, 45
+SKILL_SWEET, SKILL_TARGET, SKILL_MAX = 20, 25, 30
+LOAD_SWEET, LOAD_TARGET, LOAD_MAX = 30, 40, 50
 RUN_BUDGET_LOW, RUN_BUDGET_HIGH = 100, 150
-RATIO_TARGET = 1.5
+RATIO_TARGET = round(LOAD_TARGET / SLICE_BUDGET, 2)
 
 ROLE_SKILLS: dict[str, list[list[str]]] = {
     "director": [[]],
@@ -66,7 +66,9 @@ def measure_file(path: Path) -> dict[str, int]:
     }
 
 
-def status(value: int, target: int, maximum: int) -> str:
+def status(value: int, sweet: int, target: int, maximum: int) -> str:
+    if value <= sweet:
+        return "great"
     if value <= target:
         return "ok"
     return "near" if value <= maximum else "over"
@@ -86,7 +88,10 @@ def discover_files(root: Path) -> dict[str, dict[str, int | str]]:
     for path in sorted((root / ".claude" / "skills").glob("*/SKILL.md")):
         measurement: dict[str, int | str] = measure_file(path)
         measurement["status"] = status(
-            int(measurement["instructions"]), SKILL_TARGET, SKILL_MAX
+            int(measurement["instructions"]),
+            SKILL_SWEET,
+            SKILL_TARGET,
+            SKILL_MAX,
         )
         files[f"skill/{path.parent.name}"] = measurement
 
@@ -128,7 +133,9 @@ def main() -> int:
             if combined is None:
                 continue
             instructions = int(combined["instructions"])
-            combined["status"] = status(instructions, LOAD_TARGET, LOAD_MAX)
+            combined["status"] = status(
+                instructions, LOAD_SWEET, LOAD_TARGET, LOAD_MAX
+            )
             combined["headroom"] = RUN_BUDGET_LOW - instructions - SLICE_BUDGET
             combined["ratio"] = (
                 round(instructions / SLICE_BUDGET, 2)
@@ -150,8 +157,16 @@ def main() -> int:
     report = {
         "budgets": {
             "slice": SLICE_BUDGET,
-            "skill": {"target": SKILL_TARGET, "max": SKILL_MAX},
-            "load": {"target": LOAD_TARGET, "max": LOAD_MAX},
+            "skill": {
+                "sweet": SKILL_SWEET,
+                "target": SKILL_TARGET,
+                "max": SKILL_MAX,
+            },
+            "load": {
+                "sweet": LOAD_SWEET,
+                "target": LOAD_TARGET,
+                "max": LOAD_MAX,
+            },
             "run": {"low": RUN_BUDGET_LOW, "high": RUN_BUDGET_HIGH},
             "ratio_target": RATIO_TARGET,
         },

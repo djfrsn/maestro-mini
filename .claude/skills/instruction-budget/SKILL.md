@@ -12,10 +12,13 @@ render one HTML report with ranked suggestions.
 Treat a sentence outside code blocks and frontmatter as one instruction and
 estimate tokens as characters divided by four. Use these default budgets:
 
-- skill file: target 25 instructions, maximum 30;
-- session doctrine: target 30 instructions, maximum 45;
+- skill file: sweet spot 20 instructions, target 25, maximum 30;
+- session doctrine: sweet spot 30 instructions, target 40, maximum 50;
 - execution slice: 25 instructions;
 - full run: 100–150 instructions before reliability degrades.
+
+Keep execution-session doctrine-to-slice overhead at or below 1.6:1. Treat
+chain totals as a cross-context trend gauge.
 
 Run `python3 <skill>/references/measure.py --root <project> --json <output>`.
 Update the role-to-skill and chain maps when the project routes work differently.
