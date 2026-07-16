@@ -103,7 +103,7 @@ func TestClaudeResumedRootUsesFilenameIdentity(t *testing.T) {
 	}
 }
 
-func TestClaudePendingPromptAndLocalCommandStatus(t *testing.T) {
+func TestClaudeStatusFromPendingPromptAndStopReason(t *testing.T) {
 	tests := []struct {
 		name   string
 		id     string
@@ -112,6 +112,15 @@ func TestClaudePendingPromptAndLocalCommandStatus(t *testing.T) {
 	}{
 		{"unanswered prompt stays active", "88888888-8888-4888-8888-000000000008", StatusActive, false},
 		{"local slash command completes", "cccccccc-cccc-4ccc-8ccc-00000000000c", StatusCompleted, true},
+		{"end turn completes", "dddddddd-dddd-4ddd-8ddd-00000000000d", StatusCompleted, true},
+		{"stop sequence completes", "eeeeeeee-eeee-4eee-8eee-00000000000e", StatusCompleted, true},
+		{"max tokens completes", "ffffffff-ffff-4fff-8fff-00000000000f", StatusCompleted, true},
+		{"refusal completes", "15151515-1515-4515-8515-000000000015", StatusCompleted, true},
+		{"context window exceeded completes", "16161616-1616-4616-8616-000000000016", StatusCompleted, true},
+		{"tool use stays active", "10101010-1010-4010-8010-000000000010", StatusActive, false},
+		{"pause turn stays active", "12121212-1212-4212-8212-000000000012", StatusActive, false},
+		{"omitted stop reason stays active", "13131313-1313-4313-8313-000000000013", StatusActive, false},
+		{"null stop reason stays active", "14141414-1414-4414-8414-000000000014", StatusActive, false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

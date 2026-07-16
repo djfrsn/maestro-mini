@@ -46,7 +46,7 @@ ttx -q -t name -o - web/traceui/src/fonts/GeistMono-Variable.woff2
 ## Synthetic-fixture review
 
 All committed native-session fixtures under `internal/session/testdata` were
-reviewed on 2026-07-15: 12 JSONL files containing 39 record lines, including
+reviewed on 2026-07-15: 21 JSONL files containing 57 record lines, including
 two deliberately malformed lines. Every path is the fictitious
 `/fixture/workspace`; identifiers use repeated test patterns; and transcript
 text consists of short behavior labels or explicit `PRIVACY-*` and

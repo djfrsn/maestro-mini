@@ -1,0 +1,2 @@
+{"type":"user","cwd":"/fixture/workspace","sessionId":"13131313-1313-4313-8313-000000000013","version":"2.1.205","timestamp":"2026-07-12T16:05:00Z","message":{"role":"user","content":"synthetic active reason check"}}
+{"type":"assistant","cwd":"/fixture/workspace","sessionId":"13131313-1313-4313-8313-000000000013","version":"2.1.205","timestamp":"2026-07-12T16:05:01Z","message":{"role":"assistant","model":"claude-fable-5","content":[{"type":"text","text":"synthetic incomplete response"}],"usage":{"input_tokens":2,"output_tokens":1}}}

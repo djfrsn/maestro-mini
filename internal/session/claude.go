@@ -278,7 +278,7 @@ func (claudeProvider) ParseFile(path string) (Record, error) {
 		addError(&rec, "no Claude session records found")
 		return rec, fmt.Errorf("session: %s: empty Claude session", path)
 	}
-	if pendingPrompt || (sawAssistant && stop != "end_turn") {
+	if pendingPrompt || (sawAssistant && !isTerminalClaudeStopReason(stop)) {
 		rec.Status = StatusActive
 	} else {
 		rec.Status = StatusCompleted
@@ -288,6 +288,15 @@ func (claudeProvider) ParseFile(path string) (Record, error) {
 		}
 	}
 	return rec, nil
+}
+
+func isTerminalClaudeStopReason(stopReason string) bool {
+	switch stopReason {
+	case "end_turn", "stop_sequence", "max_tokens", "refusal", "model_context_window_exceeded":
+		return true
+	default:
+		return false
+	}
 }
 
 func (provider claudeProvider) Summarize(path string) (FileSummary, error) {

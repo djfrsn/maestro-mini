@@ -14,6 +14,7 @@ type Status string
 
 const (
 	StatusCompleted Status = "completed"
+	StatusAborted   Status = "aborted"
 	StatusActive    Status = "active"
 	StatusMissing   Status = "missing"
 	StatusMalformed Status = "malformed"

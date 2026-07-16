@@ -63,7 +63,9 @@ func TestHTTPContract(t *testing.T) {
 }
 
 func TestHTTPEdgeContract(t *testing.T) {
-	server, err := New(Options{Provider: session.Claude, Root: edgeFixtureRoot()})
+	root := t.TempDir()
+	copyTree(t, edgeFixtureRoot(), root)
+	server, err := New(Options{Provider: session.Claude, Root: root})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,8 +78,8 @@ func TestHTTPEdgeContract(t *testing.T) {
 	for _, row := range list.Sessions {
 		rows[row.SessionID] = row
 	}
-	if len(rows) != 8 {
-		t.Fatalf("roots = %d, want 8 edge roots: %#v", len(rows), rows)
+	if len(rows) != 17 {
+		t.Fatalf("roots = %d, want 17 edge roots: %#v", len(rows), rows)
 	}
 	if row := rows["aaaaaaaa-aaaa-4aaa-8aaa-00000000000a"]; row.Status != session.StatusMalformed || row.Confidence != session.ConfidenceNone {
 		t.Fatalf("malformed root summary = %#v", row)
@@ -145,11 +147,100 @@ func TestHTTPEdgeContract(t *testing.T) {
 type countingProvider struct {
 	session.Provider
 	summaries int
+	fileReads int
+}
+
+func (provider *countingProvider) ScanMeta(path string) (session.Meta, error) {
+	provider.fileReads++
+	return provider.Provider.ScanMeta(path)
+}
+
+func (provider *countingProvider) ParseFile(path string) (session.Record, error) {
+	provider.fileReads++
+	return provider.Provider.ParseFile(path)
 }
 
 func (provider *countingProvider) Summarize(path string) (session.FileSummary, error) {
 	provider.summaries++
+	provider.fileReads++
 	return provider.Provider.Summarize(path)
+}
+
+func TestHTTPStaleUnfinishedSessionIsOperationallyAborted(t *testing.T) {
+	const sessionID = "77777777-7777-4777-8777-000000000077"
+	root := t.TempDir()
+	path := writeUnfinishedSession(t, root, sessionID)
+	lastWrite := time.Now().Add(-activeSessionLease - time.Minute).Truncate(time.Second)
+	if err := os.Chtimes(path, lastWrite, lastWrite); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantEndedAt := info.ModTime().UTC()
+
+	server, err := New(Options{Provider: session.Claude, Root: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	httpServer := httptest.NewServer(server)
+	defer httpServer.Close()
+
+	var list listResponse
+	decodeBody(t, httpServer.URL+"/api/v1/sessions", &list)
+	if len(list.Sessions) != 1 {
+		t.Fatalf("sessions = %d, want 1", len(list.Sessions))
+	}
+	assertOperationallyAborted(t, "list", list.Sessions[0].Status, list.Sessions[0].EndedAt, wantEndedAt)
+
+	var tree treeResponse
+	decodeBody(t, httpServer.URL+"/api/v1/sessions/"+sessionID+"/tree", &tree)
+	if len(tree.Document.Nodes) != 1 {
+		t.Fatalf("tree nodes = %d, want 1", len(tree.Document.Nodes))
+	}
+	assertOperationallyAborted(t, "tree", tree.Document.Nodes[0].Status, tree.Document.Nodes[0].EndedAt, wantEndedAt)
+
+	var detail detailResponse
+	decodeBody(t, httpServer.URL+"/api/v1/sessions/"+sessionID+"/detail", &detail)
+	assertOperationallyAborted(t, "detail", detail.Detail.Status, detail.Detail.EndedAt, wantEndedAt)
+}
+
+func TestCacheFreshUnfinishedSessionExpiresWithoutJSONLRescan(t *testing.T) {
+	const sessionID = "77777777-7777-4777-8777-000000000077"
+	root := t.TempDir()
+	path := writeUnfinishedSession(t, root, sessionID)
+	lastWrite := time.Now().Truncate(time.Second)
+	if err := os.Chtimes(path, lastWrite, lastWrite); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantEndedAt := info.ModTime().UTC()
+
+	provider := &countingProvider{Provider: session.Claude}
+	cache := newCache(provider, root)
+	changed, err := cache.refresh(wantEndedAt.Add(time.Minute))
+	if err != nil || !changed {
+		t.Fatalf("initial refresh: changed=%v err=%v", changed, err)
+	}
+	row := cache.current().rows[0]
+	if row.Status != session.StatusActive || row.EndedAt != nil {
+		t.Fatalf("fresh unfinished row = status %q ended_at %v, want active with no end", row.Status, row.EndedAt)
+	}
+	baselineReads := provider.fileReads
+
+	changed, err = cache.refresh(wantEndedAt.Add(activeSessionLease + time.Second))
+	if err != nil || !changed {
+		t.Fatalf("expiry refresh: changed=%v err=%v, want changed snapshot for SSE", changed, err)
+	}
+	if provider.fileReads != baselineReads {
+		t.Fatalf("expiry refresh performed %d JSONL reads, want 0", provider.fileReads-baselineReads)
+	}
+	row = cache.current().rows[0]
+	assertOperationallyAborted(t, "cache", row.Status, row.EndedAt, wantEndedAt)
 }
 
 func TestCacheSkipsUnchangedFilesAndReconcilesRemoval(t *testing.T) {
@@ -387,6 +478,30 @@ func getBody(t *testing.T, url string) string {
 		t.Fatal(err)
 	}
 	return string(bytes)
+}
+
+func writeUnfinishedSession(t *testing.T, root, sessionID string) string {
+	t.Helper()
+	directory := filepath.Join(root, "-fixture-workspace")
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(directory, sessionID+".jsonl")
+	contents := `{"type":"user","timestamp":"2026-07-12T09:00:00Z","sessionId":"` + sessionID + `","cwd":"/fixture/workspace","version":"0.0.0-fixture","message":{"role":"user","content":"[fixture prompt]"}}` + "\n"
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func assertOperationallyAborted(t *testing.T, surface string, status session.Status, endedAt *time.Time, wantEndedAt time.Time) {
+	t.Helper()
+	if status != session.StatusAborted {
+		t.Fatalf("%s status = %q, want %q", surface, status, session.StatusAborted)
+	}
+	if endedAt == nil || !endedAt.Equal(wantEndedAt) {
+		t.Fatalf("%s ended_at = %v, want last write %v", surface, endedAt, wantEndedAt)
+	}
 }
 
 func copyTree(t *testing.T, source, target string) {

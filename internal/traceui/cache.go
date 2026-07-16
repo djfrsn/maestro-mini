@@ -10,6 +10,11 @@ import (
 	"github.com/djfrsn/maestro-mini/internal/session"
 )
 
+// activeSessionLease is the operational window in which an unfinished
+// session file is considered running. Claude JSONL does not expose shared
+// process status, so the append-only file mtime is the activity signal.
+const activeSessionLease = 15 * time.Minute
+
 type RootSummary struct {
 	Provider   string             `json:"provider"`
 	SessionID  string             `json:"session_id"`
@@ -33,6 +38,7 @@ type snapshot struct {
 	rows  []RootSummary
 	asOf  time.Time
 	store *session.Store
+	files map[string]fileState
 }
 
 type cache struct {
@@ -77,10 +83,7 @@ func (cache *cache) refresh(now time.Time) (bool, error) {
 		}
 	}
 	if !changed {
-		cache.mu.Lock()
-		cache.snap.asOf = now
-		cache.mu.Unlock()
-		return false, nil
+		return cache.refreshOperationalState(now), nil
 	}
 	store, err := session.ScanStore(cache.provider, cache.root)
 	if err != nil {
@@ -126,7 +129,8 @@ func (cache *cache) refresh(now time.Time) (bool, error) {
 				tree.Walk(func(*session.Node) { nodeCount++ })
 			}
 		}
-		rows = append(rows, RootSummary{Provider: cache.provider.Name(), SessionID: id, StartedAt: started, EndedAt: summary.EndedAt, Status: summary.Status, Model: summary.Model, Usage: usage, NodeCount: nodeCount, SourcePath: path, Confidence: summary.Confidence})
+		status, endedAt := operationalState(summary, state.mtime, now)
+		rows = append(rows, RootSummary{Provider: cache.provider.Name(), SessionID: id, StartedAt: started, EndedAt: endedAt, Status: status, Model: summary.Model, Usage: usage, NodeCount: nodeCount, SourcePath: path, Confidence: summary.Confidence})
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		left, right := rowStart(rows[i]), rowStart(rows[j])
@@ -137,9 +141,95 @@ func (cache *cache) refresh(now time.Time) (bool, error) {
 	})
 	cache.files = nextFiles
 	cache.mu.Lock()
-	cache.snap = snapshot{rows: rows, asOf: now, store: store}
+	cache.snap = snapshot{rows: rows, asOf: now, store: store, files: nextFiles}
 	cache.mu.Unlock()
 	return true, nil
+}
+
+// refreshOperationalState advances time-dependent lifecycle state while
+// reusing every cached summary. It reports a change when a fresh active file
+// crosses the lease boundary so the poller emits an SSE invalidation.
+func (cache *cache) refreshOperationalState(now time.Time) bool {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	rows := cache.snap.rows
+	changed := false
+	for i, row := range cache.snap.rows {
+		state, ok := cache.snap.files[row.SourcePath]
+		if !ok {
+			continue
+		}
+		status, endedAt := operationalState(state.summary, state.mtime, now)
+		if row.Status == status && equalTimes(row.EndedAt, endedAt) {
+			continue
+		}
+		if !changed {
+			rows = append([]RootSummary(nil), cache.snap.rows...)
+			changed = true
+		}
+		rows[i].Status = status
+		rows[i].EndedAt = endedAt
+	}
+	cache.snap.rows = rows
+	cache.snap.asOf = now
+	return changed
+}
+
+// operationalState closes an unfinished session after its source file has
+// received no writes for one lease. The last write is the best available end
+// time for an interrupted run.
+func operationalState(summary session.FileSummary, mtimeNanos int64, asOf time.Time) (session.Status, *time.Time) {
+	if summary.Status != session.StatusActive || summary.EndedAt != nil {
+		return summary.Status, utcTime(summary.EndedAt)
+	}
+	lastWrite := time.Unix(0, mtimeNanos).UTC()
+	if asOf.Sub(lastWrite) <= activeSessionLease {
+		return session.StatusActive, nil
+	}
+	return session.StatusAborted, &lastWrite
+}
+
+func equalTimes(left, right *time.Time) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	return left.Equal(*right)
+}
+
+func utcTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	result := value.UTC()
+	return &result
+}
+
+// projectOperationalRecord applies the snapshot's operational lifecycle to a
+// record parsed for tree or detail display, keeping every HTTP surface aligned
+// with the root list.
+func (snap snapshot) projectOperationalRecord(record *session.Record) {
+	if record.Status == session.StatusMalformed || record.Status == session.StatusMissing {
+		return
+	}
+	state, ok := snap.files[record.SourcePath]
+	if !ok {
+		return
+	}
+	record.Status, record.EndedAt = operationalState(state.summary, state.mtime, snap.asOf)
+}
+
+func (snap snapshot) projectOperationalTree(tree session.Tree) {
+	tree.Walk(func(node *session.Node) {
+		if node.Status == session.StatusMalformed || node.Status == session.StatusMissing {
+			return
+		}
+		state, ok := snap.files[node.SourcePath]
+		if !ok {
+			return
+		}
+		node.Status, node.EndedAt = operationalState(state.summary, state.mtime, snap.asOf)
+	})
 }
 
 func aggregateUsage(tree session.Tree) *session.Usage {

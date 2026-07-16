@@ -230,6 +230,7 @@ func (server *Server) handleTree(w http.ResponseWriter, request *http.Request) {
 		writeError(w, 500, "tree unavailable")
 		return
 	}
+	snap.projectOperationalTree(tree)
 	writeJSON(w, 200, treeResponse{formatInstant(snap.asOf), session.Export(tree)})
 }
 
@@ -244,6 +245,7 @@ func (server *Server) handleDetail(w http.ResponseWriter, request *http.Request)
 		writeError(w, 404, "session not found")
 		return
 	}
+	snap.projectOperationalRecord(&record)
 	counts := map[string]int{}
 	for _, count := range session.EventKindCounts(record.Events) {
 		counts[count.Kind] = count.Count

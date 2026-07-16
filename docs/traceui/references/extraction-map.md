@@ -19,7 +19,7 @@ behavior and the plan owns delivery order.
 | `internal/session/export.go`, `encode.go` | `internal/session/contract.go` | Keep only canonical tree response projection and deterministic encoding used by the server. |
 | `internal/session/transcript.go` | `internal/session/transcript.go` | Keep the neutral transcript model and dispatcher; pair it directly with the Claude implementation. |
 | `internal/session/testdata/claude-*` | `internal/session/testdata/claude-*` | Recreate as synthetic publication-safe fixtures with the minimum records needed for each behavior. |
-| `internal/traceui/cache.go` | `internal/traceui/cache.go` | Reduce to one provider/root, retain stat signatures, unchanged-file reuse, malformed isolation, aggregation, and immutable snapshots. Remove source merge and Codex lease logic. |
+| `internal/traceui/cache.go` | `internal/traceui/cache.go` | Reduce to one provider/root; retain stat signatures, unchanged-file reuse, malformed isolation, aggregation, immutable snapshots, and the 15-minute unfinished-session activity lease for Claude files. |
 | `internal/traceui/server.go` | `internal/traceui/server.go` | Keep list, tree, detail, SSE, loopback server lifecycle, JSON errors, and embedded UI. Remove A2A, wide-event, legacy index, and multi-source paths. |
 | `internal/traceui/server_v1.go` | `internal/traceui/site.go` | Serve the typed SSR shell at `/` and content-hashed assets at `/assets/`. |
 | `internal/traceui/sse.go` | `internal/traceui/sse.go` | Keep bounded change broadcasting and keep-alives. |
