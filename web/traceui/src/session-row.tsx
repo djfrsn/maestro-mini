@@ -49,7 +49,7 @@ function RowExpansion({ rootId }: { rootId: string }): JSX.Element {
   // dropped from its snapshot: show the graceful notice and let the store prune
   // it on the next refresh. A row that had loaded once and then 404ed on a live
   // refetch keeps its last-good tree (cache behaviour) and is left in place.
-  const gone = !doc && isSessionGone(tree.error.value);
+  const gone = isSessionGone(tree.error.value);
   useEffect(() => {
     if (gone) {
       markSessionGone(rootId);
@@ -79,7 +79,7 @@ function RowExpansion({ rootId }: { rootId: string }): JSX.Element {
           <p class="tree-loading">loading tree…</p>
         )}
       </div>
-      {detailNode ? <DetailPanel node={detailNode} /> : null}
+      {detailNode ? <DetailPanel node={detailNode} rootId={rootId} /> : null}
     </div>
   );
 }

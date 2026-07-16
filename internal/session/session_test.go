@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 )
 
@@ -16,6 +17,10 @@ func edgeRoot() string { return filepath.Join("testdata", "claude-edge") }
 
 func edgePath(id string) string {
 	return filepath.Join(edgeRoot(), "-fixture-workspace", id+".jsonl")
+}
+
+func interruptPath(id string) string {
+	return filepath.Join("testdata", "claude-interrupt", "-fixture-workspace", id+".jsonl")
 }
 
 func TestClaudeStoreBuildsNativeTree(t *testing.T) {
@@ -132,6 +137,59 @@ func TestClaudeStatusFromPendingPromptAndStopReason(t *testing.T) {
 				t.Fatalf("status/ended = %s/%v, want %s/%v", record.Status, record.EndedAt, test.status, test.ended)
 			}
 		})
+	}
+}
+
+func TestClaudeInterruptLifecycle(t *testing.T) {
+	tests := []struct {
+		name, id, ended string
+		status          Status
+	}{
+		{"plain marker aborts", "c1c1c1c1-c1c1-4c1c-8c1c-00000000c1c1", "2026-07-12T16:00:05Z", StatusAborted},
+		{"tool-use marker aborts", "c2c2c2c2-c2c2-4c2c-8c2c-00000000c2c2", "2026-07-12T16:10:04Z", StatusAborted},
+		{"later prompt reactivates", "d1d1d1d1-d1d1-4d1d-8d1d-00000000d1d1", "", StatusActive},
+		{"quoted marker is a prompt", "d2d2d2d2-d2d2-4d2d-8d2d-00000000d2d2", "", StatusActive},
+		{"continued marker is a prompt", "d3d3d3d3-d3d3-4d3d-8d3d-00000000d3d3", "", StatusActive},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			record, err := Claude.ParseFile(interruptPath(test.id))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if record.Status != test.status {
+				t.Fatalf("status = %q, want %q", record.Status, test.status)
+			}
+			if test.ended == "" {
+				if record.EndedAt != nil {
+					t.Fatalf("ended_at = %v, want nil", record.EndedAt)
+				}
+				return
+			}
+			want, err := time.Parse(time.RFC3339, test.ended)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if record.EndedAt == nil || !record.EndedAt.Equal(want) {
+				t.Fatalf("ended_at = %v, want %v", record.EndedAt, want)
+			}
+		})
+	}
+}
+
+func TestClaudeLastActivityTracksFinalTimestampedRecord(t *testing.T) {
+	path := interruptPath("d1d1d1d1-d1d1-4d1d-8d1d-00000000d1d1")
+	record, err := Claude.ParseFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := time.Parse(time.RFC3339, "2026-07-12T16:20:30Z")
+	if record.LastActivityAt == nil || !record.LastActivityAt.Equal(want) {
+		t.Fatalf("last_activity_at = %v, want %v", record.LastActivityAt, want)
+	}
+	summary, err := Claude.Summarize(path)
+	if err != nil || summary.LastActivityAt == nil || !summary.LastActivityAt.Equal(want) {
+		t.Fatalf("summary last_activity_at = %v, err = %v, want %v", summary.LastActivityAt, err, want)
 	}
 }
 

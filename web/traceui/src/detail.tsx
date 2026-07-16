@@ -11,12 +11,13 @@
 //     ref, not scraped back out of the DOM.
 // Every transcript string reaches the DOM as text via JSX, never as HTML.
 import { type JSX } from "preact";
-import { useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { isSessionGone } from "./api.ts";
 import { copyWithFlash } from "./clipboard.ts";
 import type { SessionNode, TranscriptEntry } from "./contract.gen.ts";
 import { fmtLocalClock, parseTs } from "./format.ts";
 import { detailResource } from "./resources.ts";
+import { markSessionGone } from "./store.ts";
 
 // A reader within this many pixels of the bottom is "following" the newest
 // turn, so a live refresh keeps them pinned rather than freezing the offset.
@@ -73,7 +74,13 @@ function TranscriptRow({
   );
 }
 
-export function DetailPanel({ node }: { node: SessionNode }): JSX.Element {
+export function DetailPanel({
+  node,
+  rootId,
+}: {
+  node: SessionNode;
+  rootId: string;
+}): JSX.Element {
   const resource = detailResource(node.session_id);
   const [openRefs, setOpenRefs] = useState<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
@@ -83,6 +90,11 @@ export function DetailPanel({ node }: { node: SessionNode }): JSX.Element {
 
   const doc = resource.data.value;
   const detail = doc?.detail;
+  const rootGone =
+    node.session_id === rootId && isSessionGone(resource.error.value);
+  useEffect(() => {
+    if (rootGone) markSessionGone(rootId);
+  }, [rootGone, rootId]);
 
   // After the transcript content changes (a new fetch), re-pin to the bottom
   // only if the reader was following. When they have scrolled up, the stable

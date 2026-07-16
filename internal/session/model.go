@@ -70,6 +70,7 @@ type Record struct {
 	Status          Status
 	Confidence      Confidence
 	EndedAt         *time.Time
+	LastActivityAt  *time.Time
 	Usage           *Usage
 	AliasSessionIDs []string
 	ChildSpawns     []ChildSpawn
@@ -78,13 +79,14 @@ type Record struct {
 }
 
 type FileSummary struct {
-	Meta       Meta
-	Status     Status
-	EndedAt    *time.Time
-	Model      string
-	Usage      *Usage
-	Confidence Confidence
-	Errors     []string
+	Meta           Meta
+	Status         Status
+	EndedAt        *time.Time
+	LastActivityAt *time.Time
+	Model          string
+	Usage          *Usage
+	Confidence     Confidence
+	Errors         []string
 }
 
 type Node struct {

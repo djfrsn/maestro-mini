@@ -406,7 +406,7 @@ body {
 .copied::after { content: " ✓"; }
 .detail-header code.copied { border-color: var(--wf-c3); }
 
-/* At-a-glance session summary strip: volume totals over the loaded rows. */
+/* At-a-glance session summary strip: dataset totals and loaded-row busiest. */
 .session-summary {
   display: flex;
   align-items: center;

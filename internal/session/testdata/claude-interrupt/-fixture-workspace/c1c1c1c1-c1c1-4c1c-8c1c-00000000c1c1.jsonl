@@ -1,0 +1,5 @@
+{"type":"user","timestamp":"2026-07-12T16:00:00Z","sessionId":"c1c1c1c1-c1c1-4c1c-8c1c-00000000c1c1","cwd":"/fixture/workspace","message":{"role":"user","content":"[fixture prompt]"}}
+{"type":"assistant","timestamp":"2026-07-12T16:00:02Z","sessionId":"c1c1c1c1-c1c1-4c1c-8c1c-00000000c1c1","message":{"role":"assistant","content":[{"type":"tool_use","id":"tool-1","name":"Bash"}],"stop_reason":"tool_use"}}
+{"type":"user","timestamp":"2026-07-12T16:00:03Z","sessionId":"c1c1c1c1-c1c1-4c1c-8c1c-00000000c1c1","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tool-1","content":"fixture"}]}}
+{"type":"user","timestamp":"2026-07-12T16:00:05Z","sessionId":"c1c1c1c1-c1c1-4c1c-8c1c-00000000c1c1","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]}}
+{"type":"last-prompt","sessionId":"c1c1c1c1-c1c1-4c1c-8c1c-00000000c1c1"}

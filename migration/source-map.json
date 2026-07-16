@@ -27,14 +27,20 @@
   "traceui": {
     "source_repository": "https://github.com/gigabrain-os/maestro.git",
     "source_commit": "955e60083abf55b556b2c26e159e3e8cc8340383",
+    "supplemental_commits": [
+      "cc5be01a382dbbf0318885cc64fb9242ff64b34c",
+      "42dd8558dd8b8c1c490794adb86a0b7058e8843c",
+      "0c261e77e1b4a2e4ac9a10f38b1fdc990029bb81",
+      "7b9b57b808b09e4bbdf4d67a9a7c83aedec85509"
+    ],
     "source_ui_path": "internal/traceui/web-v1/src",
     "provenance_receipt": "docs/traceui/provenance.md",
     "font_license": "docs/traceui/licenses/OFL-1.1.txt",
     "fixture_review": {
-      "reviewed_at": "2026-07-15",
+      "reviewed_at": "2026-07-16",
       "path": "internal/session/testdata",
-      "jsonl_files": 21,
-      "record_lines": 57
+      "jsonl_files": 26,
+      "record_lines": 75
     }
   }
 }

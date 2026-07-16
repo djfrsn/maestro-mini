@@ -1,6 +1,6 @@
 # TraceUI provenance receipt
 
-Verified: 2026-07-15
+Verified: 2026-07-16
 
 ## Source authorization and baseline
 
@@ -19,6 +19,13 @@ verifiable with:
 git -C <source-checkout> show 955e60083abf55b556b2c26e159e3e8cc8340383:internal/traceui/web-v1/src/style.css
 git -C <source-checkout> log --format='%an <%ae>' -- internal/session internal/traceui
 ```
+
+Later portable corrections were adapted from these Maestro commits:
+
+- [`cc5be01a382dbbf0318885cc64fb9242ff64b34c`](https://github.com/gigabrain-os/maestro/commit/cc5be01a382dbbf0318885cc64fb9242ff64b34c) for Claude interrupt and killed-session lifecycle handling;
+- [`42dd8558dd8b8c1c490794adb86a0b7058e8843c`](https://github.com/gigabrain-os/maestro/commit/42dd8558dd8b8c1c490794adb86a0b7058e8843c) for mounted virtual-row measurement;
+- [`0c261e77e1b4a2e4ac9a10f38b1fdc990029bb81`](https://github.com/gigabrain-os/maestro/commit/0c261e77e1b4a2e4ac9a10f38b1fdc990029bb81) for dataset-wide overview totals; and
+- [`7b9b57b808b09e4bbdf4d67a9a7c83aedec85509`](https://github.com/gigabrain-os/maestro/commit/7b9b57b808b09e4bbdf4d67a9a7c83aedec85509) for pagination-preserving SSE reconciliation.
 
 ## Font redistribution
 
@@ -46,7 +53,7 @@ ttx -q -t name -o - web/traceui/src/fonts/GeistMono-Variable.woff2
 ## Synthetic-fixture review
 
 All committed native-session fixtures under `internal/session/testdata` were
-reviewed on 2026-07-15: 21 JSONL files containing 57 record lines, including
+reviewed on 2026-07-16: 26 JSONL files containing 75 record lines, including
 two deliberately malformed lines. Every path is the fictitious
 `/fixture/workspace`; identifiers use repeated test patterns; and transcript
 text consists of short behavior labels or explicit `PRIVACY-*` and
