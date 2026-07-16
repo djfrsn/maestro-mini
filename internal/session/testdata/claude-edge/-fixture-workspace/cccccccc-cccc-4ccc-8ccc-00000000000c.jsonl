@@ -1,0 +1,4 @@
+{"type":"queue-operation","operation":"enqueue","content":"/context","sessionId":"cccccccc-cccc-4ccc-8ccc-00000000000c","timestamp":"2026-07-12T15:00:00Z"}
+{"type":"user","isMeta":true,"cwd":"/fixture/workspace","sessionId":"cccccccc-cccc-4ccc-8ccc-00000000000c","version":"2.1.205","timestamp":"2026-07-12T15:00:01Z","message":{"role":"user","content":"<local-command-caveat>local command</local-command-caveat>"}}
+{"type":"user","cwd":"/fixture/workspace","sessionId":"cccccccc-cccc-4ccc-8ccc-00000000000c","version":"2.1.205","timestamp":"2026-07-12T15:00:02Z","message":{"role":"user","content":"<command-name>/context</command-name>"}}
+{"type":"system","subtype":"local_command","cwd":"/fixture/workspace","sessionId":"cccccccc-cccc-4ccc-8ccc-00000000000c","version":"2.1.205","timestamp":"2026-07-12T15:00:03Z","content":"<local-command-stdout>context usage</local-command-stdout>"}

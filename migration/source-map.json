@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "source_agent_count": 5,
   "source_skill_count": 13,
   "agents": {
@@ -23,5 +23,18 @@
     "swe-checking": "checking",
     "swe-engineering": "engineering",
     "triage": "triage"
+  },
+  "traceui": {
+    "source_repository": "https://github.com/gigabrain-os/maestro.git",
+    "source_commit": "955e60083abf55b556b2c26e159e3e8cc8340383",
+    "source_ui_path": "internal/traceui/web-v1/src",
+    "provenance_receipt": "docs/traceui/provenance.md",
+    "font_license": "docs/traceui/licenses/OFL-1.1.txt",
+    "fixture_review": {
+      "reviewed_at": "2026-07-15",
+      "path": "internal/session/testdata",
+      "jsonl_files": 12,
+      "record_lines": 39
+    }
   }
 }

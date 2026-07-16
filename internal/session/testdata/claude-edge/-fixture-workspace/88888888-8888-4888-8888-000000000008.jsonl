@@ -1,0 +1,3 @@
+{"type":"user","cwd":"/fixture/workspace","sessionId":"88888888-8888-4888-8888-000000000008","version":"2.1.205","timestamp":"2026-07-12T14:00:00Z","message":{"role":"user","content":"first prompt"}}
+{"type":"assistant","cwd":"/fixture/workspace","sessionId":"88888888-8888-4888-8888-000000000008","version":"2.1.205","timestamp":"2026-07-12T14:00:10Z","message":{"role":"assistant","model":"claude-fable-5","content":[{"type":"text","text":"first answer"}],"stop_reason":"end_turn","usage":{"input_tokens":30,"output_tokens":10}}}
+{"type":"user","cwd":"/fixture/workspace","sessionId":"88888888-8888-4888-8888-000000000008","version":"2.1.205","timestamp":"2026-07-12T14:05:00Z","message":{"role":"user","content":"pending prompt"}}

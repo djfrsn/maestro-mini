@@ -4,6 +4,9 @@ The public package preserves every agent and skill capability in the current
 workflow baseline while replacing repository-specific state, paths, commands,
 and provider formats with Claude Code Markdown.
 
+TraceUI source and asset publication evidence is recorded in the
+[provenance receipt](traceui/provenance.md).
+
 ## Agents
 
 | Source role | Public Claude agent | Disposition |
@@ -42,3 +45,10 @@ control plane through the prompts under `heartbeats/`.
 The live source inventory and platform-neutral expansions are recorded in
 [`text-replacements/manifest.json`](../text-replacements/manifest.json). Every
 entry can be generated for Windows and macOS without becoming a Claude skill.
+
+## TraceUI
+
+TraceUI was extracted from Maestro commit
+`955e60083abf55b556b2c26e159e3e8cc8340383`. Its original UI baseline is
+`internal/traceui/web-v1/src`; the detailed source-to-target mapping remains in
+the [extraction map](traceui/references/extraction-map.md).
